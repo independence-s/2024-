@@ -8,6 +8,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 添加服务到容器
 builder.Services.AddControllers();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll",
+        policy =>
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -19,7 +29,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowVueFronted", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")//Vue开发服务器默认端口
+        policy.WithOrigins()//Vue开发服务器默认端口
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); //需要携带Cookie/认证信息
@@ -36,7 +46,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseCors("AllowVueFrontend");
+app.UseCors("AllowAll");
 app.UseAuthorization();
 app.MapControllers();
 
