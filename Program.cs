@@ -15,6 +15,17 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowVueFronted", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173")//Vue开发服务器默认端口
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); //需要携带Cookie/认证信息
+    });
+});
+
 var app = builder.Build();
 
 // 配置 HTTP 请求管道
@@ -25,6 +36,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors("AllowVueFrontend");
 app.UseAuthorization();
 app.MapControllers();
 
