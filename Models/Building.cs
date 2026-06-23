@@ -2,7 +2,7 @@
 using System.ComponentModel.DataAnnotations.Schema;
 namespace 数据库课程设计.Models
 {
-    [Table("Building")]
+    [Table("Buildings")]
     public class Building
     {
         [Key]
