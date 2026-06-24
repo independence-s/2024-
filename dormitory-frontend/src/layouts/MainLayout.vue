@@ -12,39 +12,48 @@
         :default-active="$route.path"
         router
       >
-        <!-- 所有用户都能看到控制台 -->
         <el-menu-item index="/dashboard">
           <el-icon><DataBoard /></el-icon>
           <span>控制台</span>
         </el-menu-item>
+        <el-menu-item index="/residences">
+          <el-icon><HomeFilled /></el-icon>
+          <span>住宿管理</span>
+        </el-menu-item>
 
-        <!-- 所有用户都能看到学生管理-->
-        <el-menu-item index="/students">
+        <el-menu-item v-if="userInfo?.role === 2" index="/students">
           <el-icon><User /></el-icon>
           <span>学生管理</span>
         </el-menu-item>
 
-        <!-- 所有用户都能看到房间管理 -->
-        <el-menu-item index="/rooms">
-          <el-icon><HomeFilled /></el-icon>
-          <span>房间管理</span>
-        </el-menu-item>
-
-        <!-- 仅管理员（role === 2）能看到宿舍楼管理 -->
         <el-menu-item v-if="userInfo?.role === 2" index="/buildings">
           <el-icon><OfficeBuilding /></el-icon>
           <span>宿舍楼管理</span>
         </el-menu-item>
 
-        <!-- 所有用户都能看到报修管理（后续可细分） -->
-        <el-menu-item index="/repairs">
+        <el-menu-item v-if="userInfo?.role === 1 || userInfo?.role === 2" index="/rooms">
+          <el-icon><HomeFilled /></el-icon>
+          <span>房间管理</span>
+        </el-menu-item>
+
+        <el-menu-item v-if="userInfo?.role === 1 || userInfo?.role === 2" index="/repairs">
           <el-icon><Tools /></el-icon>
           <span>报修管理</span>
+        </el-menu-item>
+
+        <el-menu-item v-if="userInfo?.role === 2" index="/users">
+          <el-icon><Setting /></el-icon>
+          <span>用户管理</span>
+        </el-menu-item>
+
+        <el-menu-item index="/my-repairs">
+          <el-icon><Document /></el-icon>
+          <span>我的报修</span>
         </el-menu-item>
       </el-menu>
     </el-aside>
 
-    <!-- 右侧主区域（保持不变） -->
+    <!-- 右侧主区域 -->
     <el-container>
       <el-header style="background-color: #fff; border-bottom: 1px solid #e6e6e6; display: flex; align-items: center; justify-content: space-between; padding: 0 20px;">
         <span style="font-size: 18px; font-weight: bold;">宿舍管理系统</span>
@@ -63,7 +72,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { DataBoard, User, HomeFilled, Tools, OfficeBuilding } from '@element-plus/icons-vue'
+import { DataBoard, User, HomeFilled, Tools, OfficeBuilding, Setting, Document } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userInfo = ref({})

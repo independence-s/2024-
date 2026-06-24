@@ -27,7 +27,7 @@
         style="width: 100%;"
         v-loading="loading"
       >
-        <el-table-column prop="studentId" label="ID" width="80" />
+        <el-table-column prop="studentId" label="序号" width="80" />
         <el-table-column prop="studentNo" label="学号" width="150" />
         <el-table-column prop="name" label="姓名" width="120" />
         <el-table-column prop="gender" label="性别" width="80" />
@@ -35,6 +35,22 @@
         <el-table-column prop="email" label="邮箱" min-width="180" />
         <el-table-column prop="college" label="学院" min-width="150" />
         <el-table-column prop="class" label="班级" min-width="120" />
+
+        <!-- 宿舍列 -->
+        <el-table-column label="宿舍" width="200">
+          <template #default="{ row }">
+            <template v-if="row.currentRoom">
+              <el-tag size="small" type="primary">
+                {{ row.currentRoom.buildingName }} - {{ row.currentRoom.roomNumber }}
+              </el-tag>
+              <span style="font-size: 12px; color: #909399; margin-left: 6px;">
+                {{ row.currentRoom.floorNumber }}楼
+              </span>
+            </template>
+            <span v-else style="color: #c0c4cc;">未分配</span>
+          </template>
+        </el-table-column>
+
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === 0 ? 'success' : 'info'">
@@ -72,8 +88,8 @@
         </el-form-item>
         <el-form-item label="性别" prop="gender">
           <el-radio-group v-model="formData.gender">
-            <el-radio label="男">男</el-radio>
-            <el-radio label="女">女</el-radio>
+            <el-radio value="男">男</el-radio>
+            <el-radio value="女">女</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="手机号" prop="phone">
@@ -82,6 +98,18 @@
         <el-form-item label="邮箱" prop="email">
           <el-input v-model="formData.email" />
         </el-form-item>
+
+        <!-- 当前宿舍显示（编辑时只读） -->
+        <el-form-item label="当前宿舍" v-if="isEdit">
+          <span v-if="currentRoomInfo">
+            {{ currentRoomInfo.buildingName }} - {{ currentRoomInfo.roomNumber }}
+            <span style="font-size: 12px; color: #909399; margin-left: 6px;">
+              {{ currentRoomInfo.floorNumber }}楼
+            </span>
+          </span>
+          <span v-else style="color: #c0c4cc;">未分配</span>
+        </el-form-item>
+
         <el-form-item label="学院" prop="college">
           <el-input v-model="formData.college" />
         </el-form-item>
@@ -90,8 +118,8 @@
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="formData.status">
-            <el-radio :label="0">在读</el-radio>
-            <el-radio :label="1">已毕业</el-radio>
+            <el-radio :value="0">在读</el-radio>
+            <el-radio :value="1">已毕业</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -108,15 +136,14 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { studentApi } from '../api/student'
 
-// ============ 数据 ============
 const students = ref([])
 const loading = ref(false)
 const searchKeyword = ref('')
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref(null)
+const currentRoomInfo = ref(null)
 
-// 表单数据
 const formData = reactive({
   studentId: 0,
   studentNo: '',
@@ -129,14 +156,12 @@ const formData = reactive({
   status: 0
 })
 
-// 表单验证规则
 const formRules = {
   studentNo: [{ required: true, message: '请输入学号', trigger: 'blur' }],
   name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
   gender: [{ required: true, message: '请选择性别', trigger: 'change' }]
 }
 
-// ============ 计算属性 ============
 const dialogTitle = computed(() => isEdit.value ? '编辑学生' : '新增学生')
 
 const filteredStudents = computed(() => {
@@ -147,8 +172,6 @@ const filteredStudents = computed(() => {
   )
 })
 
-// ============ 方法 ============
-// 加载数据
 const loadStudents = async () => {
   loading.value = true
   try {
@@ -162,30 +185,37 @@ const loadStudents = async () => {
   }
 }
 
-// 搜索
-const handleSearch = () => {
-  // 已通过 computed 自动过滤
-}
+const handleSearch = () => {}
 
 const resetSearch = () => {
   searchKeyword.value = ''
 }
 
-// 打开新增弹窗
 const openAddDialog = () => {
   isEdit.value = false
+  currentRoomInfo.value = null
   dialogVisible.value = true
   resetForm()
 }
 
-// 打开编辑弹窗
 const openEditDialog = (row) => {
   isEdit.value = true
   dialogVisible.value = true
-  Object.assign(formData, row)
+
+  // 手动映射字段
+  formData.studentId = row.studentId
+  formData.studentNo = row.studentNo
+  formData.name = row.name
+  formData.gender = row.gender
+  formData.phone = row.phone || ''
+  formData.email = row.email || ''
+  formData.college = row.college || ''
+  formData.class = row.class || ''
+  formData.status = row.status
+
+  currentRoomInfo.value = row.currentRoom || null
 }
 
-// 重置表单
 const resetForm = () => {
   Object.assign(formData, {
     studentId: 0,
@@ -194,27 +224,36 @@ const resetForm = () => {
     gender: '男',
     phone: '',
     email: '',
-    college: '',
-    class: '',
+    collegeName: '',
+    className: '',
     status: 0
   })
-  if (formRef.value) {
-    formRef.value.clearValidate()
-  }
+  currentRoomInfo.value = null
+  formRef.value?.clearValidate()
 }
 
-// 提交表单
 const submitForm = async () => {
   try {
     await formRef.value.validate()
 
+    // 构建提交数据，将 collegeName 和 className 映射为后端需要的字段
+    const submitData = {
+      studentId: formData.studentId,
+      studentNo: formData.studentNo,
+      name: formData.name,
+      gender: formData.gender,
+      phone: formData.phone || '',
+      email: formData.email || '',
+      college: formData.college || '',
+      class: formData.class || '',
+      status: formData.status
+    }
+    console.log('提交数据',submitData)
     if (isEdit.value) {
-      // 更新
-      await studentApi.update(formData.studentId, formData)
+      await studentApi.update(formData.studentId, submitData)
       ElMessage.success('更新成功！')
     } else {
-      // 新增
-      await studentApi.create(formData)
+      await studentApi.create(submitData)
       ElMessage.success('添加成功！')
     }
 
@@ -230,7 +269,6 @@ const submitForm = async () => {
   }
 }
 
-// 删除
 const handleDelete = (row) => {
   ElMessageBox.confirm(
     `确定要删除学生 ${row.name}（${row.studentNo}）吗？`,
@@ -252,7 +290,6 @@ const handleDelete = (row) => {
   }).catch(() => {})
 }
 
-// ============ 生命周期 ============
 onMounted(() => {
   loadStudents()
 })

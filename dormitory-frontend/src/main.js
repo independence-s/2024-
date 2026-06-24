@@ -4,7 +4,7 @@ import 'element-plus/dist/index.css'
 import App from './App.vue'
 import router from './router'  // 默认导入
 import axios from 'axios'
-
+import { House } from '@element-plus/icons-vue'
 // 请求拦截器：自动携带 Token
 axios.interceptors.request.use(
   config => {

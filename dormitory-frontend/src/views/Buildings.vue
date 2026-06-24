@@ -20,8 +20,15 @@
     <!-- 表格 -->
     <el-card>
       <el-table :data="filteredBuildings" border stripe v-loading="loading">
-        <el-table-column prop="buildingId" label="ID" width="80" />
+        <el-table-column prop="buildingId" label="序号" width="80" />
         <el-table-column prop="buildingName" label="楼名" width="150" />
+        <el-table-column label="宿舍楼类型" width="120">
+          <template #default="{ row }">
+            <el-tag :type="row.gender === '男' ? 'primary' : 'danger'">
+              {{ row.gender === '男' ? '男生楼' : '女生楼' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="totalFloors" label="楼层数" width="100" />
         <el-table-column prop="address" label="地址" min-width="180" />
         <el-table-column prop="managerName" label="楼管姓名" width="120" />
@@ -35,11 +42,17 @@
       </el-table>
     </el-card>
 
-    <!-- 新增/编辑弹窗 -->
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px" @close="resetForm">
       <el-form ref="formRef" :model="formData" :rules="formRules" label-width="100px">
         <el-form-item label="楼名" prop="buildingName">
           <el-input v-model="formData.buildingName" />
+        </el-form-item>
+        <!-- 新增：性别选择-->
+        <el-form-item label="宿舍楼类型" prop="gender">
+          <el-radio-group v-model="formData.gender">
+            <el-radio label="男">男生楼</el-radio>
+            <el-radio label="女">女生楼</el-radio>
+          </el-radio-group>
         </el-form-item>
         <el-form-item label="楼层数" prop="totalFloors">
           <el-input-number v-model="formData.totalFloors" :min="1" :max="30" />
@@ -77,6 +90,7 @@ const formRef = ref(null)
 const formData = reactive({
   buildingId: 0,
   buildingName: '',
+  gender: '男', 
   totalFloors: 1,
   address: '',
   managerName: '',
@@ -85,6 +99,7 @@ const formData = reactive({
 
 const formRules = {
   buildingName: [{ required: true, message: '请输入楼名', trigger: 'blur' }],
+  gender: [{ required: true, message: '请选择宿舍楼类型', trigger: 'change' }],
   totalFloors: [{ required: true, message: '请输入楼层数', trigger: 'blur' }]
 }
 
@@ -125,6 +140,7 @@ const resetForm = () => {
   Object.assign(formData, {
     buildingId: 0,
     buildingName: '',
+    gender: '男',
     totalFloors: 1,
     address: '',
     managerName: '',

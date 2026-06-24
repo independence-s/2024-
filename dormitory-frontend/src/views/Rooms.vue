@@ -27,6 +27,14 @@
             {{ row.building?.buildingName || '未关联' }}
           </template>
         </el-table-column>
+        <el-table-column label="宿舍楼类型" width="120">
+          <template #default="{ row }">
+            <el-tag v-if="row.building?.gender" :type="row.building.gender === '男' ? 'primary' : 'danger'">
+              {{ row.building.gender === '男' ? '男生楼' : '女生楼' }}
+            </el-tag>
+            <span v-else style="color: #c0c4cc;">未设置</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="floorNumber" label="楼层" width="80" />
         <el-table-column prop="capacity" label="总床位数" width="100" />
         <el-table-column prop="availableBeds" label="空床位数" width="100" />
@@ -37,9 +45,12 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+
+        <!-- 操作列：增加“查看入住”按钮 -->
+        <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="openEditDialog(row)">编辑</el-button>
+            <el-button type="success" size="small" @click="openStudentsDialog(row)">查看入住</el-button>
             <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -54,10 +65,16 @@
             <el-option
               v-for="building in buildingOptions"
               :key="building.buildingId"
-              :label="building.buildingName"
+              :label="`${building.buildingName}（${building.gender === '男' ? '男生楼' : '女生楼'}）`"
               :value="building.buildingId"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item label="宿舍楼类型" v-if="formData.buildingId">
+          <el-tag :type="selectedBuildingGender === '男' ? 'primary' : 'danger'">
+            {{ selectedBuildingGender === '男' ? '男生楼' : '女生楼' }}
+          </el-tag>
+          <span style="font-size: 12px; color: #909399; margin-left: 10px;">（由所属宿舍楼决定，不可单独修改）</span>
         </el-form-item>
         <el-form-item label="楼层" prop="floorNumber">
           <el-input-number v-model="formData.floorNumber" :min="1" :max="30" />
@@ -69,10 +86,10 @@
           <el-input-number v-model="formData.capacity" :min="1" :max="8" />
         </el-form-item>
         <el-form-item label="空床位数" prop="availableBeds">
-          <el-input-number v-model="formData.availableBeds" :min="0" :max="8" />
+          <el-input-number v-model="formData.availableBeds" :min="0" :max="formData.capacity" />
         </el-form-item>
         <el-form-item label="房间类型" prop="roomType">
-          <el-radio-group v-model="formData.roomType">
+          <el-radio-group v-model="formData.roomType" @change="onRoomTypeChange">
             <el-radio :label="0">四人间</el-radio>
             <el-radio :label="1">六人间</el-radio>
             <el-radio :label="2">八人间</el-radio>
@@ -84,6 +101,26 @@
         <el-button type="primary" @click="submitForm">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 查看入住学生弹窗 -->
+    <el-dialog
+      v-model="studentsDialogVisible"
+      :title="`${currentRoom?.roomNumber || ''} 房间入住学生列表`"
+      width="800px"
+    >
+      <el-table :data="roomStudents" border stripe v-loading="studentsLoading">
+        <el-table-column prop="studentId" label="学生ID" width="80" />
+        <el-table-column prop="studentNo" label="学号" width="150" />
+        <el-table-column prop="name" label="姓名" width="120" />
+        <el-table-column prop="gender" label="性别" width="80" />
+        <el-table-column prop="phone" label="手机号" width="150" />
+        <el-table-column prop="college" label="学院" min-width="150" />
+        <el-table-column prop="class" label="班级" min-width="120" />
+      </el-table>
+      <template #footer>
+        <el-button @click="studentsDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -93,16 +130,20 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { roomApi } from '../api/room'
 import { buildingApi } from '../api/building'
 
-// ============ 数据 ============
 const rooms = ref([])
-const buildingOptions = ref([])      // 用于下拉框的楼栋列表
+const buildingOptions = ref([])
 const loading = ref(false)
 const searchKeyword = ref('')
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref(null)
 
-// 表单数据
+// 查看入住学生相关
+const studentsDialogVisible = ref(false)
+const studentsLoading = ref(false)
+const roomStudents = ref([])
+const currentRoom = ref(null)
+
 const formData = reactive({
   roomId: 0,
   buildingId: null,
@@ -113,16 +154,40 @@ const formData = reactive({
   roomType: 0
 })
 
-// 表单验证
+// 自定义校验：总床位数在1-8之间
+const validateCapacity = (rule, value, callback) => {
+  if (value < 1 || value > 8) {
+    callback(new Error('总床位数应在1-8之间'))
+  } else {
+    callback()
+  }
+}
+
+// 自定义校验：空床位数不能为负且不能大于总床位数
+const validateAvailableBeds = (rule, value, callback) => {
+  if (value < 0) {
+    callback(new Error('空床位数不能小于0'))
+  } else if (value > formData.capacity) {
+    callback(new Error('空床位数不能大于总床位数'))
+  } else {
+    callback()
+  }
+}
+
 const formRules = {
   buildingId: [{ required: true, message: '请选择宿舍楼', trigger: 'change' }],
   floorNumber: [{ required: true, message: '请输入楼层', trigger: 'blur' }],
   roomNumber: [{ required: true, message: '请输入房间号', trigger: 'blur' }],
-  capacity: [{ required: true, message: '请输入总床位数', trigger: 'blur' }],
-  availableBeds: [{ required: true, message: '请输入空床位数', trigger: 'blur' }]
+  capacity: [
+    { required: true, message: '请输入总床位数', trigger: 'blur' },
+    { validator: validateCapacity, trigger: 'blur' }
+  ],
+  availableBeds: [
+    { required: true, message: '请输入空床位数', trigger: 'blur' },
+    { validator: validateAvailableBeds, trigger: 'blur' }
+  ]
 }
 
-// ============ 计算属性 ============
 const dialogTitle = computed(() => isEdit.value ? '编辑房间' : '新增房间')
 
 const filteredRooms = computed(() => {
@@ -134,8 +199,11 @@ const filteredRooms = computed(() => {
   )
 })
 
-// ============ 方法 ============
-// 加载房间列表
+const selectedBuildingGender = computed(() => {
+  const building = buildingOptions.value.find(b => b.buildingId === formData.buildingId)
+  return building?.gender || '男'
+})
+
 const loadRooms = async () => {
   loading.value = true
   try {
@@ -149,7 +217,6 @@ const loadRooms = async () => {
   }
 }
 
-// 加载宿舍楼列表（用于下拉框）
 const loadBuildings = async () => {
   try {
     const res = await buildingApi.getAll()
@@ -160,31 +227,36 @@ const loadBuildings = async () => {
   }
 }
 
-// 打开新增弹窗
+// 房间类型与标准床位数的映射
+const typeCapacityMap = { 0: 4, 1: 6, 2: 8 }
+
+// 房间类型变化时，仅在新增时自动设置床位
+const onRoomTypeChange = (val) => {
+  if (!isEdit.value) {
+    formData.capacity = typeCapacityMap[val] || 4
+    formData.availableBeds = formData.capacity
+  }
+}
+
 const openAddDialog = () => {
   isEdit.value = false
   dialogVisible.value = true
   resetForm()
-  // 确保下拉框有数据
   if (buildingOptions.value.length === 0) {
     loadBuildings()
   }
 }
 
-// 打开编辑弹窗
 const openEditDialog = (row) => {
   isEdit.value = true
   dialogVisible.value = true
-  // 复制数据到表单
   Object.assign(formData, row)
-  // 如果关联的楼栋信息存在，确保 buildingId 正确
   formData.buildingId = row.buildingId
   if (buildingOptions.value.length === 0) {
     loadBuildings()
   }
 }
 
-// 重置表单
 const resetForm = () => {
   Object.assign(formData, {
     roomId: 0,
@@ -198,7 +270,6 @@ const resetForm = () => {
   formRef.value?.clearValidate()
 }
 
-// 提交表单
 const submitForm = async () => {
   try {
     await formRef.value.validate()
@@ -210,7 +281,7 @@ const submitForm = async () => {
       ElMessage.success('添加成功！')
     }
     dialogVisible.value = false
-    loadRooms()          // 刷新列表
+    loadRooms()
   } catch (error) {
     if (error.response) {
       ElMessage.error(error.response.data || '操作失败')
@@ -221,7 +292,6 @@ const submitForm = async () => {
   }
 }
 
-// 删除
 const handleDelete = (row) => {
   ElMessageBox.confirm(
     `确定要删除房间 ${row.roomNumber} 吗？`,
@@ -243,7 +313,22 @@ const handleDelete = (row) => {
   }).catch(() => {})
 }
 
-// ============ 生命周期 ============
+// 查看入住学生
+const openStudentsDialog = async (row) => {
+  currentRoom.value = row
+  studentsDialogVisible.value = true
+  studentsLoading.value = true
+  try {
+    const res = await roomApi.getStudentsByRoom(row.roomId)
+    roomStudents.value = res.data
+  } catch (error) {
+    ElMessage.error('加载入住学生失败')
+    console.error(error)
+  } finally {
+    studentsLoading.value = false
+  }
+}
+
 onMounted(() => {
   loadRooms()
   loadBuildings()

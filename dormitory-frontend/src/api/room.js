@@ -1,14 +1,23 @@
 import axios from 'axios'
 
-const apiClient = axios.create({
-  baseURL: 'http://localhost:5000/api',
-  timeout: 10000
-})
-
 export const roomApi = {
-  getAll() { return apiClient.get('/Rooms') },
-  getById(id) { return apiClient.get(`/Rooms/${id}`) },
-  create(data) { return apiClient.post('/Rooms', data) },
-  update(id, data) { return apiClient.put(`/Rooms/${id}`, data) },
-  delete(id) { return apiClient.delete(`/Rooms/${id}`) }
+  getAll() {
+    return axios.get('http://localhost:5000/api/Rooms')
+  },
+  getById(id) {
+    return axios.get(`http://localhost:5000/api/Rooms/${id}`)
+  },
+  create(data) {
+    return axios.post('http://localhost:5000/api/Rooms', data)
+  },
+  update(id, data) {
+    return axios.put(`http://localhost:5000/api/Rooms/${id}`, data)
+  },
+  delete(id) {
+    return axios.delete(`http://localhost:5000/api/Rooms/${id}`)
+  },
+  // 获取某房间的入住学生列表
+  getStudentsByRoom(roomId) {
+    return axios.get(`http://localhost:5000/api/Rooms/${roomId}/students`)
+  }
 }
